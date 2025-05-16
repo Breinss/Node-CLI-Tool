@@ -1,12 +1,45 @@
 use std::fs;
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use scan_dir::ScanDir;
 
 #[derive(Debug)]
 pub enum MyError {
     Scan(scan_dir::Error),
     File(io::Error, PathBuf),
+}
+
+/// Checks if a path is within any of our target locations
+fn is_in_target_locations(path: &Path) -> bool {
+    // Get user's home directory to expand ~ paths
+    let home_dir = dirs::home_dir().unwrap_or_default();
+    
+    // List of specific locations to check
+    let target_locations = [
+        PathBuf::from("./node_modules"),
+        // PathBuf::from("/usr/lib/node_modules"),
+        // PathBuf::from("/usr/local/lib/node_modules"),
+        home_dir.join(".node_modules"),
+        home_dir.join(".node_libraries"),
+        home_dir.join(".npm/_cacache"),
+        home_dir.join(".npm-packages/lib/node_modules"),
+        home_dir.join(".cache/yarn"),
+        home_dir.join(".yarn-config"),
+        home_dir.join(".pnpm-store"),
+        // home_dir.join(".docker"),
+        // home_dir.join(".vscode"),
+        PathBuf::from("/tmp"),
+        home_dir.join(".cache"),
+    ];
+    
+    // Check if the path is contained within any target location
+    for target in &target_locations {
+        if path == target || path.starts_with(target) {
+            return true;
+        }
+    }
+    
+    false
 }
 
 /// Scans directories and files from the home directory.
@@ -41,15 +74,9 @@ pub fn scan(scan_path: PathBuf) -> Result<Vec<PathBuf>, MyError> {
                 .unwrap_or(false);
                 
                 if is_node_modules {
-                    println!("Found node_modules: {:?}", entry.path());
-                    let is_in_cache = entry.path().ancestors().any(|ancestor| {
-                        ancestor.file_name()
-                            .and_then(|name| name.to_str())
-                            .map(|name| name == ".cache")
-                            .unwrap_or(false)
-                    });
-                    
-                    if is_in_cache {
+                    // println!("Found node_modules: {:?}", entry.path());
+                    // Fix: Add & to borrow the PathBuf
+                    if is_in_target_locations(&entry.path()) {
                         // Add this path to our collection
                         cache_modules_paths.push(entry.path().to_path_buf());
                     }
@@ -93,11 +120,11 @@ pub fn scan(scan_path: PathBuf) -> Result<Vec<PathBuf>, MyError> {
 
 pub fn process_cache_modules(paths: Vec<PathBuf>) -> Result<(), MyError> {
     if paths.is_empty() {
-        println!("No node_modules directories found in .cache");
+        println!("No node_modules directories found in cache");
         return Ok(());
     }
 
-    println!("Found {} node_modules directories in .cache:", paths.len());
+    println!("Found {} node_modules directories in cache:", paths.len());
     for (i, path) in paths.iter().enumerate() {
         println!("{}: {:?}", i + 1, path);
     }
