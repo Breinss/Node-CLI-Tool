@@ -1,5 +1,5 @@
 [package]
-name = "Node-CLI-Tool"
+name = "nodetrash"
 version = "0.1.0"
 edition = "2024"
 
